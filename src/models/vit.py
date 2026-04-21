@@ -79,6 +79,7 @@ class PatchEmbedding(nn.Module):
 class VisionTransformer(nn.Module):
     def __init__(self, cfg: VitConfig) -> None:
         super().__init__()
+        self.embed_dim = cfg.embed_dim
         num_patches = (cfg.img_size // cfg.patch_size) ** 2
         self.cls_token = nn.Parameter(torch.zeros(1, 1, cfg.embed_dim))
         self.register_tokens = nn.Parameter(
@@ -107,4 +108,7 @@ class VisionTransformer(nn.Module):
         for block in self.blocks:
             x = block(x)
 
-        return self.norm(x)
+        x =  self.norm(x)
+        # Remove register tokens before returning
+        num_register_tokens = self.register_tokens.shape[1]
+        return torch.cat((x[:, :1], x[:, 1 + num_register_tokens :]), dim=1)
