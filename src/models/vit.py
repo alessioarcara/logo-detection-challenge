@@ -1,6 +1,7 @@
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 from torch.nn import functional as F
+
 from src.generated import VitConfig
 
 
@@ -108,7 +109,7 @@ class VisionTransformer(nn.Module):
         for block in self.blocks:
             x = block(x)
 
-        x =  self.norm(x)
+        x = self.norm(x)
         # Remove register tokens before returning
         num_register_tokens = self.register_tokens.shape[1]
         return torch.cat((x[:, :1], x[:, 1 + num_register_tokens :]), dim=1)

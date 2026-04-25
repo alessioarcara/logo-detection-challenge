@@ -10,16 +10,23 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "albumentations>=2.0.8",
-    "ezconfy>=0.1.8",
+    "ezconfy==0.1.10",
+    "matplotlib>=3.10.9",
+    "opencv-python>=4.13.0.92",
     "pipelime-python>=2.2.0",
     "torch>=2.11.0",
+    "wandb>=0.26.0",
 ]
 authors = [
     { name = "Alessio Arcara", email = "alessio.arcara@studio.unibo.it" },
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9.0.2", "ruff>=0.15.8", "ty>=0.0.27"]
+dev = ["mypy>=1.20.2", "pytest>=9.0.2", "ruff>=0.15.8"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+[tool.mypy]
+files = ["src"]
+ignore_missing_imports = true

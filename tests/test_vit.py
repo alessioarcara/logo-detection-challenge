@@ -1,7 +1,9 @@
 import pytest
 import torch
-from src.models.vit import VitConfig, VisionTransformer
-from src.utils.checkpoint import load_weights 
+
+from src.models.vit import VisionTransformer, VitConfig
+from src.utils.checkpoint import load_weights
+
 
 @pytest.fixture
 def vit_config() -> VitConfig:
@@ -22,6 +24,7 @@ def vit_config() -> VitConfig:
 def model(vit_config: VitConfig) -> VisionTransformer:
     return VisionTransformer(vit_config)
 
+
 def test_load_dino_ckpt(model: VisionTransformer) -> None:
     ckpt = torch.load(
         "checkpoints/dinov2_vits14_reg4_pretrain.pth",
@@ -40,4 +43,3 @@ def test_vit_forward_runs(model: VisionTransformer) -> None:
     x = torch.randn(1, 3, 518, 518)
     with torch.inference_mode():
         model(x)
-

@@ -1,0 +1,42 @@
+types:
+  TorchModule: torch.nn:Module
+  Path: pathlib:Path
+  AlbumentationsCompose: albumentations:Compose
+  LogoDatasetGenerator: ./src/generator.py:LogoDatasetGenerator
+
+schema:
+  seed: int
+  device: str
+
+  wandb_entity: str
+  wandb_project: str
+  wandb_run_name: str
+
+  num_epochs: int
+  output_dir: Path
+  generator: LogoDatasetGenerator
+  model: TorchModule
+  optim: torch.optim:Optimizer
+  scheduler: torch.optim.lr_scheduler:LRScheduler
+
+  vit_config:
+    img_size: int
+    patch_size: int
+    in_channels: int
+    embed_dim: int
+    depth: int
+    num_heads: int
+    mlp_ratio: float
+    ls_init_value: float
+    num_register_tokens: int
+
+  generator_config:
+    logos_dir: Path
+    backgrounds_dir: Path
+    output_size: list[int]
+    length: int
+    negative_ratio: float
+    seed: int
+    max_retries: int
+    logo_transform: AlbumentationsCompose
+    composition_transform: AlbumentationsCompose

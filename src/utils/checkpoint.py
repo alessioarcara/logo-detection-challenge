@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
+from loguru import logger
 
-from src.typings import StateDict
+from src.utils.typings import StateDict
 
 
 def load_weights(model: nn.Module, sd: StateDict) -> None:
@@ -15,4 +16,4 @@ def load_weights(model: nn.Module, sd: StateDict) -> None:
 
     for name, tensor in model.state_dict().items():
         changed = not torch.allclose(before[name], tensor)
-        print(f"{'changed' if changed else 'unchanged'} {name}")
+        logger.info("{} {}", "changed" if changed else "unchanged", name)

@@ -174,3 +174,4 @@ pyrightconfig.json
 .vscode/
 checkpoints/
 data/
+generated.py

@@ -1,0 +1,68 @@
+seed: 42
+num_epochs: 100
+
+output_dir: "/tmp/eyecan_test/data/train"
+
+generator:
+  _target_type_: ./src/generator.py:LogoDatasetGenerator
+  _init_args_:
+    logos_dir: "/tmp/eyecan_test/assets/logos"
+    backgrounds_dir: "/tmp/eyecan_test/assets/backgrounds"
+
+    output_size: [518, 518]
+    length: 10
+    negative_ratio: 0.1
+    seed: 42
+    max_retries: 10
+
+    logo_transform:
+      _target_type_: albumentations:Compose
+      _init_args_:
+        transforms:
+          - _target_type_: albumentations:LongestMaxSize
+            _init_args_: { max_size: 518 }
+
+    composition_transform:
+      _target_type_: albumentations:Compose
+      _init_args_:
+        transforms: []
+        bbox_params:
+          _target_type_: albumentations:BboxParams
+          _init_args_:
+            format: coco
+            min_visibility: 0.3
+            label_fields: [labels]
+
+optim:
+  _target_type_: torch.optim:AdamW
+  _init_args_:
+    params: ${model.parameters()}
+    lr: 1.0e-4
+    weight_decay: 0.0
+
+scheduler:
+  _target_type_: torch.optim.lr_scheduler:OneCycleLR
+  _init_args_:
+    optimizer: ${optim}
+    max_lr: 0.01
+    steps_per_epoch: ${dataset.__len__()}
+    epochs: ${num_epochs}
+
+vit_config:
+  img_size: 518
+  patch_size: 14
+  in_channels: 3
+  embed_dim: 384
+  depth: 12
+  num_heads: 6
+  mlp_ratio: 4.0
+  ls_init_value: 1.0e-6
+  num_register_tokens: 4
+
+model:
+  _target_type_: ./src/models/detector.py:Detector
+  _init_args_:
+    backbone:
+      _target_type_: ./src/models/vit.py:VisionTransformer
+      _init_args_:
+        cfg: ${vit_config}
