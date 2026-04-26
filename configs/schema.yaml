@@ -4,6 +4,8 @@ types:
   AugmentationPipeline: albumentations:Compose
   Dataloader: torch.utils.data:DataLoader
   Blend: ./src/generator/blends.py:Blend
+  Callback: ./src/training/callbacks.py:Callback
+  EarlyStoppingCallback: ./src/training/callbacks.py:EarlyStoppingCallback
 
 schema:
   seed: int
@@ -25,7 +27,9 @@ schema:
   optim: torch.optim:Optimizer
   scheduler: torch.optim.lr_scheduler:LRScheduler
   train_loader: Dataloader
+  criterion: TorchModule
   metrics: ./src/training/metrics.py:MetricCollection
+  callbacks: list[Callback]
 
   vit_config:
     img_size: int

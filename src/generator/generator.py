@@ -63,7 +63,9 @@ class LogoDatasetGenerator:
         logger.info(f"Wrote {len(self)} samples to {folder}")
         return folder
 
-    def _prepare_seed_rng(self, scene_idx: int, attempt: int) -> tuple[int, np.random.Generator]:
+    def _prepare_seed_rng(
+        self, scene_idx: int, attempt: int
+    ) -> tuple[int, np.random.Generator]:
         """
         Derive a deterministic seed from (base_seed, scene, attempt) and align
         numpy rng + albumentations transforms to the same random state.
@@ -85,7 +87,9 @@ class LogoDatasetGenerator:
 
         for attempt in range(self._config.max_retries):
             seed, rng = self._prepare_seed_rng(scene_idx, attempt)
-            sample = self._try_generate_sample(idx, scene_idx, seed, rng, with_logo=True)
+            sample = self._try_generate_sample(
+                idx, scene_idx, seed, rng, with_logo=True
+            )
 
             # * logo may be cropped out by composition transform, retry with a new attempt seed
             if sample["bboxes"]().shape[0] > 0:

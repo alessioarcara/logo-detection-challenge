@@ -3,6 +3,7 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 from src.generated import VitConfig
+from src.utils.checkpoint import load_weights
 
 
 class LayerScale(nn.Module):
@@ -93,6 +94,13 @@ class VisionTransformer(nn.Module):
         )
         self.blocks = nn.ModuleList([EncoderBlock(cfg) for _ in range(cfg.depth)])
         self.norm = nn.LayerNorm(cfg.embed_dim)
+
+    @classmethod
+    def from_pretrained(cls, cfg: VitConfig, checkpoint_path: str) -> "VisionTransformer":
+        model = cls(cfg)
+        ckpt = torch.load(checkpoint_path, weights_only=True)
+        load_weights(model, ckpt)
+        return model
 
     def forward(self, x: Tensor) -> Tensor:
         B = x.shape[0]
