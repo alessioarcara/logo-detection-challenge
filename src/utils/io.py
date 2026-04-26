@@ -16,11 +16,11 @@ def get_image_paths_in_dir(
     if not directory.is_dir():
         raise NotADirectoryError(f"Not a directory: {directory}")
 
-    return [
+    return sorted(
         p
         for p in directory.rglob("*")
         if p.is_file() and p.suffix.lower() in extensions
-    ]
+    )
 
 
 def load_rgb(

@@ -1,8 +1,9 @@
 types:
   TorchModule: torch.nn:Module
   Path: pathlib:Path
-  AlbumentationsCompose: albumentations:Compose
-  LogoDatasetGenerator: ./src/generator.py:LogoDatasetGenerator
+  AugmentationPipeline: albumentations:Compose
+  Dataloader: torch.utils.data:DataLoader
+  Blend: ./src/generator/blends.py:Blend
 
 schema:
   seed: int
@@ -13,11 +14,18 @@ schema:
   wandb_run_name: str
 
   num_epochs: int
-  output_dir: Path
-  generator: LogoDatasetGenerator
+  eval_freq: int
+  image_size: int
+
+  use_mixed_precision: bool
+  compile_model: bool
+
+  generator: ./src/generator/generator.py:LogoDatasetGenerator
   model: TorchModule
   optim: torch.optim:Optimizer
   scheduler: torch.optim.lr_scheduler:LRScheduler
+  train_loader: Dataloader
+  metrics: ./src/training/metrics.py:MetricCollection
 
   vit_config:
     img_size: int
@@ -38,5 +46,7 @@ schema:
     negative_ratio: float
     seed: int
     max_retries: int
-    logo_transform: AlbumentationsCompose
-    composition_transform: AlbumentationsCompose
+    blends: list[Blend]
+    same_scene_blend_variants: bool
+    logo_transform: AugmentationPipeline
+    composition_transform: AugmentationPipeline

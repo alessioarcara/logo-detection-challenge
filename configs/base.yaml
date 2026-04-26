@@ -1,37 +1,142 @@
 seed: 42
-num_epochs: 100
+device: cuda
 
-output_dir: "/tmp/eyecan_test/data/train"
+wandb_entity: aarcara
+wandb_project: eyecan
+wandb_run_name: test
+
+num_epochs: 100
+eval_freq: 1
+image_size: 518
+
+use_mixed_precision: true
+compile_model: false
+
+generator_config:
+  logos_dir: "data/logos"
+  backgrounds_dir: "data/backgrounds"
+  output_size:
+    - ${image_size}
+    - ${image_size}
+  length: 1000
+  negative_ratio: 0.1
+  seed: 42
+  max_retries: 10
+  blends:
+    - _target_type_: ./src/generator/blends.py:AlphaBlend
+      _init_args_: {}
+    - _target_type_: ./src/generator/blends.py:GaussianBlend
+      _init_args_:
+        sigma: 2.0
+  same_scene_blend_variants: true
+
+  logo_transform:
+    _target_type_: albumentations:Compose
+    _init_args_:
+      transforms:
+        - _target_type_: albumentations:LongestMaxSize
+          _init_args_:
+            max_size: ${image_size}
+        - _target_type_: albumentations:Affine
+          _init_args_:
+            scale: [0.2, 0.7]
+            rotate: [-180, 180]
+            shear: [-30, 30]
+            translate_percent:
+              x: [-0.5, 0.5]
+              y: [-0.5, 0.5]
+            border_mode: 0
+            fill: 0
+            p: 1.0
+        - _target_type_: albumentations:Perspective
+          _init_args_:
+            scale: [0.05, 0.20]
+            keep_size: true
+            border_mode: 0
+            fill: 0
+            p: 0.7
+        - _target_type_: albumentations:HueSaturationValue
+          _init_args_:
+            hue_shift_limit: 180
+            sat_shift_limit: [-5, 80]
+            val_shift_limit: [-30, 50]
+            p: 1.0
+        - _target_type_: albumentations:OneOf
+          _init_args_:
+            transforms:
+              - _target_type_: albumentations:RGBShift
+                _init_args_:
+                  r_shift_limit: 80
+                  g_shift_limit: 80
+                  b_shift_limit: 80
+                  p: 1.0
+              - _target_type_: albumentations:ChannelShuffle
+                _init_args_:
+                  p: 1.0
+              - _target_type_: albumentations:ColorJitter
+                _init_args_:
+                  brightness: 0.4
+                  contrast: 0.4
+                  saturation: 0.8
+                  hue: 0.5
+                  p: 1.0
+            p: 0.8
+        - _target_type_: albumentations:ToGray
+          _init_args_:
+            p: 0.05
+        - _target_type_: albumentations:OneOf
+          _init_args_:
+            transforms:
+              - _target_type_: albumentations:RandomGamma
+                _init_args_:
+                  gamma_limit: [70, 140]
+                  p: 1.0
+              - _target_type_: albumentations:RandomBrightnessContrast
+                _init_args_:
+                  brightness_limit: 0.35
+                  contrast_limit: 0.35
+                  p: 1.0
+            p: 0.35
+
+  composition_transform:
+    _target_type_: albumentations:Compose
+    _init_args_:
+      transforms: []
+      bbox_params:
+        _target_type_: albumentations:BboxParams
+        _init_args_:
+          format: coco
+          min_visibility: 0.3
+          label_fields: [labels]
 
 generator:
-  _target_type_: ./src/generator.py:LogoDatasetGenerator
+  _target_type_: ./src/generator/generator.py:LogoDatasetGenerator
   _init_args_:
-    logos_dir: "/tmp/eyecan_test/assets/logos"
-    backgrounds_dir: "/tmp/eyecan_test/assets/backgrounds"
+    config: ${generator_config}
 
-    output_size: [518, 518]
-    length: 10
-    negative_ratio: 0.1
-    seed: 42
-    max_retries: 10
-
-    logo_transform:
-      _target_type_: albumentations:Compose
+train_loader:
+  _target_type_: torch.utils.data:DataLoader
+  _init_args_:
+    dataset:
+      _target_type_: ./src/data.py:DetectionDataset
       _init_args_:
-        transforms:
-          - _target_type_: albumentations:LongestMaxSize
-            _init_args_: { max_size: 518 }
-
-    composition_transform:
-      _target_type_: albumentations:Compose
-      _init_args_:
-        transforms: []
-        bbox_params:
-          _target_type_: albumentations:BboxParams
+        dataset: ${generator.as_torch_dataset()}
+        transform:
+          _target_type_: albumentations:Compose
           _init_args_:
-            format: coco
-            min_visibility: 0.3
-            label_fields: [labels]
+            transforms:
+              - _target_type_: albumentations:Normalize
+                _init_args_: {}
+              - _target_type_: albumentations:ToTensorV2
+                _init_args_: {}
+    batch_size: 64
+    shuffle: true
+    num_workers: 15
+    pin_memory: true
+    persistent_workers: true
+    collate_fn:
+      _target_type_: ./src/data.py:DetectionCollateFn
+      _init_args_: {}
 
 optim:
   _target_type_: torch.optim:AdamW
@@ -41,15 +146,13 @@ optim:
     weight_decay: 0.0
 
 scheduler:
-  _target_type_: torch.optim.lr_scheduler:OneCycleLR
+  _target_type_: torch.optim.lr_scheduler:CosineAnnealingLR
   _init_args_:
     optimizer: ${optim}
-    max_lr: 0.01
-    steps_per_epoch: ${dataset.__len__()}
-    epochs: ${num_epochs}
+    T_max: ${num_epochs}
 
 vit_config:
-  img_size: 518
+  img_size: ${image_size}
   patch_size: 14
   in_channels: 3
   embed_dim: 384
@@ -66,3 +169,8 @@ model:
       _target_type_: ./src/models/vit.py:VisionTransformer
       _init_args_:
         cfg: ${vit_config}
+
+metrics:
+  _target_type_: ./src/metrics.py:MetricCollection
+  _init_args_:
+    metrics: []

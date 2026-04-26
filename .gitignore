@@ -175,3 +175,4 @@ pyrightconfig.json
 checkpoints/
 data/
 generated.py
+wandb/
