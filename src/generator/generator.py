@@ -12,10 +12,10 @@ from pipelime.sequences import Sample, SamplesSequence  # type: ignore[import-un
 from torch.utils.data import Dataset as TorchDataset
 
 from src.generator.blender import Blender
-from src.utils.bbox import to_array
+from src.utils.bbox import bbox_center, bbox_from_alpha, shift_point, to_array
 from src.utils.io import get_image_paths_in_dir, load_rgb, load_rgba
 from src.utils.random import seed_for
-from src.utils.typings import BBox, PathLike
+from src.utils.typings import BBox, PathLike, Point
 
 if TYPE_CHECKING:
     from src.generated import GeneratorConfig
@@ -91,12 +91,11 @@ class LogoDatasetGenerator:
                 idx, scene_idx, seed, rng, with_logo=True
             )
 
-            # * logo may be cropped out by composition transform, retry with a new attempt seed
-            if sample["bboxes"]().shape[0] > 0:
+            if bool(sample["has_target"]()):
                 return sample
 
         raise RuntimeError(
-            f"Sample {idx}: logo was cropped out in all "
+            f"Sample {idx}: logo center was cropped out in all "
             f"{self._config.max_retries} attempts. "
             "Consider relaxing min_visibility or the composition transform."
         )
@@ -115,46 +114,60 @@ class LogoDatasetGenerator:
 
         image = bg
         bboxes: list[BBox] = []
+        keypoints: list[Point] = []
         blend = None
 
         if with_logo:
             blend = self._blender.pick_blend(idx, rng)
             logo_rgb, logo_alpha = self._logos[rng.integers(len(self._logos))]
 
+            logo_bbox = bbox_from_alpha(logo_alpha)
+            logo_keypoints = [bbox_center(logo_bbox)] if logo_bbox else []
+
             transformed = self._config.logo_transform(
                 image=logo_rgb,
                 mask=logo_alpha,
+                keypoints=logo_keypoints,
             )
 
-            image, bbox = self._blender.paste(
+            transformed_keypoints = transformed.get("keypoints", [])
+
+            paste_result = self._blender.paste(
                 bg=bg,
                 logo_rgb=transformed["image"],
                 logo_alpha=transformed["mask"],
                 rng=rng,
                 blend=blend,
             )
+            image = paste_result.image
 
-            if bbox is not None:
-                bboxes.append(bbox)
+            if paste_result.bbox is not None and transformed_keypoints:
+                bboxes.append(paste_result.bbox)
+                keypoints.append(
+                    shift_point(transformed_keypoints[0][:2], paste_result.origin)
+                )
 
         augmented = self._config.composition_transform(
             image=image,
             bboxes=bboxes,
+            keypoints=keypoints,
             labels=[0] * len(bboxes),
         )
 
         aug_bboxes = augmented.get("bboxes", [])
-        has_target = len(aug_bboxes) > 0
+        aug_keypoints = augmented.get("keypoints", [])
 
-        # * keypoint = bbox center in pixels and normalized [0, 1] coordinates
+        has_target = len(aug_bboxes) > 0 and len(aug_keypoints) > 0
+
         keypoint_px = np.zeros(2, dtype=np.float32)
         keypoint = np.zeros(2, dtype=np.float32)
 
         if has_target:
-            x, y, w, h = aug_bboxes[0]
-            cx, cy = x + w / 2, y + h / 2
-            keypoint_px = np.array([cx, cy], dtype=np.float32)
-            keypoint = np.array([cx / output_w, cy / output_h], dtype=np.float32)
+            keypoint_px = np.asarray(aug_keypoints[0][:2], dtype=np.float32)
+            keypoint = np.array(
+                [keypoint_px[0] / output_w, keypoint_px[1] / output_h],
+                dtype=np.float32,
+            )
 
         return Sample(
             {

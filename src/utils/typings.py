@@ -7,6 +7,7 @@ import torch
 StateDict: TypeAlias = dict[str, torch.Tensor]
 PathLike: TypeAlias = Path | str
 BBox: TypeAlias = tuple[float, float, float, float]
+Point: TypeAlias = tuple[float, float]
 MetricResults: TypeAlias = dict[str, float]
 
 

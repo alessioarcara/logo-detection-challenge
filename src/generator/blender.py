@@ -1,8 +1,16 @@
+from typing import NamedTuple
+
 import numpy as np
 
 from src.generator.blends import Blend
 from src.utils.bbox import bbox_from_alpha, shift_bbox
-from src.utils.typings import BBox
+from src.utils.typings import BBox, Point
+
+
+class PasteResult(NamedTuple):
+    image: np.ndarray
+    bbox: BBox | None
+    origin: Point
 
 
 class Blender:
@@ -46,7 +54,7 @@ class Blender:
         logo_alpha: np.ndarray,
         rng: np.random.Generator,
         blend: Blend,
-    ) -> tuple[np.ndarray, BBox | None]:
+    ) -> PasteResult:
         bg_h, bg_w = bg.shape[:2]
         logo_h, logo_w = logo_rgb.shape[:2]
 
@@ -58,10 +66,11 @@ class Blender:
 
         x = int(rng.integers(0, bg_w - logo_w + 1))
         y = int(rng.integers(0, bg_h - logo_h + 1))
+        origin = float(x), float(y)
 
         bbox = bbox_from_alpha(logo_alpha)
         if bbox is None:
-            return bg.copy(), None
+            return PasteResult(image=bg.copy(), bbox=None, origin=origin)
 
         image = blend.paste(
             bg=bg,
@@ -71,4 +80,4 @@ class Blender:
             y=y,
         )
 
-        return image, shift_bbox(bbox, dx=x, dy=y)
+        return PasteResult(image=image, bbox=shift_bbox(bbox, origin), origin=origin)

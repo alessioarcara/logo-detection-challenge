@@ -1,7 +1,7 @@
 import numpy as np
 
 from src.utils.constants import EMPTY_BBOXES
-from src.utils.typings import BBox
+from src.utils.typings import BBox, Point
 
 
 def bbox_from_alpha(alpha: np.ndarray) -> BBox | None:
@@ -26,6 +26,18 @@ def to_array(bboxes: list[BBox]) -> np.ndarray:
     return np.asarray(bboxes, dtype=np.float32)
 
 
-def shift_bbox(bbox: BBox, dx: float, dy: float) -> BBox:
+def bbox_center(bbox: BBox) -> Point:
     x, y, w, h = bbox
+    return x + w / 2, y + h / 2
+
+
+def shift_bbox(bbox: BBox, offset: Point) -> BBox:
+    x, y, w, h = bbox
+    dx, dy = offset
     return x + dx, y + dy, w, h
+
+
+def shift_point(point: Point, offset: Point) -> Point:
+    x, y = point
+    dx, dy = offset
+    return x + dx, y + dy

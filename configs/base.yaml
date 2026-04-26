@@ -97,6 +97,11 @@ generator_config:
                   contrast_limit: 0.35
                   p: 1.0
             p: 0.35
+      keypoint_params:
+        _target_type_: albumentations:KeypointParams
+        _init_args_:
+          format: xy
+          remove_invisible: true
 
   composition_transform:
     _target_type_: albumentations:Compose
@@ -108,6 +113,11 @@ generator_config:
           format: coco
           min_visibility: 0.3
           label_fields: [labels]
+      keypoint_params:
+        _target_type_: albumentations:KeypointParams
+        _init_args_:
+          format: xy
+          remove_invisible: true
 
 generator:
   _target_type_: ./src/generator/generator.py:LogoDatasetGenerator
