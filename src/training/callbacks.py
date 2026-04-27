@@ -9,6 +9,7 @@ from loguru import logger
 from torch import Tensor
 
 import wandb
+from src.models.detector import decode_heatmap
 from src.utils.misc import sanitize
 from src.utils.typings import PathLike, Stage
 
@@ -152,12 +153,14 @@ class VisualizeCallback(Callback):
         images, target_keypoints, valid_mask = trainer._prepare_input(batch)
 
         with torch.inference_mode():
-            pred_keypoints, objectness_logits = trainer.model(images)
+            heatmap = trainer.model(images)
+
+        pred_keypoints, pred_logits = decode_heatmap(heatmap)
+        pred_probs = torch.sigmoid(pred_logits)
 
         n = min(self.num_samples, images.size(0))
         mean = self.mean.to(images.device)
         std = self.std.to(images.device)
-        objectness_probs = torch.sigmoid(objectness_logits)
 
         wandb_images = []
         for i in range(n):
@@ -168,17 +171,19 @@ class VisualizeCallback(Callback):
                 gt = target_keypoints[i].cpu().numpy()
                 cv2.circle(
                     img, self._to_px(gt, w, h), self.radius, (0, 255, 0), -1
-                )  # Green for GT
+                )
 
-            if objectness_probs[i].item() > self.objectness_threshold:
+            if pred_probs[i].item() > self.objectness_threshold:
                 pred = pred_keypoints[i].cpu().numpy()
                 cv2.circle(
                     img, self._to_px(pred, w, h), self.radius, (255, 0, 0), -1
-                )  # Red for pred
+                )
 
             wandb_images.append(wandb.Image(img))
 
-        wandb.log({f"visualizations/{self.stage.value}_keypoints": wandb_images})
+        wandb.log({
+            f"visualizations/{self.stage.value}_keypoints": wandb_images,
+        })
         return False
 
     def _denormalize(self, tensor: Tensor, mean: Tensor, std: Tensor) -> np.ndarray:

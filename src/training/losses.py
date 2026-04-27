@@ -1,35 +1,69 @@
+import torch
 import torch.nn as nn
-from loguru import logger
+import torch.nn.functional as F
 from torch import Tensor
 
 
-class LogoLoss(nn.Module):
-    def __init__(self, keypoint_loss: nn.Module) -> None:
-        super(LogoLoss, self).__init__()
-        self.keypoint_loss = keypoint_loss
+class HeatmapLoss(nn.Module):
+    """CenterNet-style modified focal loss for keypoint heatmaps.
+
+    Positive pixels (GT == 1) get ``-(1-p)^alpha * log(p)``.
+    Negative pixels get ``-(1-y)^beta * p^alpha * log(1-p)``,
+    which down-weights cells near the peak so the Gaussian
+    neighbourhood is not penalised harshly.
+    """
+
+    def __init__(
+        self,
+        sigma: float = 0.01,
+        alpha: float = 2.0,
+        beta: float = 4.0,
+    ) -> None:
+        super().__init__()
+        self.sigma = sigma  # fraction of output spatial size
+        self.alpha = alpha
+        self.beta = beta
+
+    def _build_gt_heatmap(
+        self, keypoints: Tensor, valid_mask: Tensor, height: int, width: int
+    ) -> Tensor:
+        B = keypoints.shape[0]
+        device = keypoints.device
+
+        yy, xx = torch.meshgrid(
+            torch.arange(height, device=device, dtype=torch.float32),
+            torch.arange(width, device=device, dtype=torch.float32),
+            indexing="ij",
+        )
+
+        cx = (keypoints[:, 0] * width).view(B, 1, 1)
+        cy = (keypoints[:, 1] * height).view(B, 1, 1)
+
+        sigma_px = self.sigma * min(height, width)
+        g = torch.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * sigma_px**2))
+        g = g / g.amax(dim=(-2, -1), keepdim=True).clamp(min=1e-6)
+        g = g * valid_mask.float().view(B, 1, 1)
+
+        return g.unsqueeze(1)
 
     def forward(
         self,
-        pred_keypoint: Tensor,  # [B, 2]
-        pred_objectness: Tensor,  # [B]
-        target_keypoint: Tensor,  # [B, 2]
-        valid_mask: Tensor,  # [B]
+        pred_heatmap: Tensor,  # (B, 1, H, W) logits
+        target_keypoint: Tensor,  # (B, 2)
+        valid_mask: Tensor,  # (B,)
     ) -> dict[str, Tensor]:
-        objectness_loss = nn.functional.binary_cross_entropy_with_logits(
-            pred_objectness.squeeze(-1),
-            valid_mask.float(),
+        _, _, H, W = pred_heatmap.shape
+        gt = self._build_gt_heatmap(target_keypoint, valid_mask, H, W)
+
+        pred = torch.sigmoid(pred_heatmap)
+
+        loss = torch.where(
+            gt.eq(1),
+            -((1 - pred) ** self.alpha) * F.logsigmoid(pred_heatmap),
+            -((1 - gt) ** self.beta) * (pred**self.alpha) * F.logsigmoid(-pred_heatmap),
         )
 
-        if valid_mask.any():
-            keypoint_loss = self.keypoint_loss(
-                pred_keypoint[valid_mask], target_keypoint[valid_mask]
-            )
-        else:
-            logger.warning("No valid targets in batch, skipping keypoint loss")
-            keypoint_loss = pred_keypoint.sum() * 0.0
+        num_pos = valid_mask.float().sum().clamp(min=1)
+        loss = loss.sum() / num_pos
 
-        return {
-            "loss": objectness_loss + keypoint_loss,
-            "objectness_loss": objectness_loss,
-            "keypoint_loss": keypoint_loss,
-        }
+        return {"loss": loss, "heatmap_loss": loss}

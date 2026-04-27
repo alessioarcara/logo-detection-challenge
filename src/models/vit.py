@@ -82,7 +82,8 @@ class VisionTransformer(nn.Module):
     def __init__(self, cfg: VitConfig) -> None:
         super().__init__()
         self.embed_dim = cfg.embed_dim
-        num_patches = (cfg.img_size // cfg.patch_size) ** 2
+        self.num_patches_per_side = cfg.img_size // cfg.patch_size
+        num_patches = self.num_patches_per_side**2
         self.cls_token = nn.Parameter(torch.zeros(1, 1, cfg.embed_dim))
         self.register_tokens = nn.Parameter(
             torch.zeros(1, cfg.num_register_tokens, cfg.embed_dim)
@@ -96,13 +97,15 @@ class VisionTransformer(nn.Module):
         self.norm = nn.LayerNorm(cfg.embed_dim)
 
     @classmethod
-    def from_pretrained(cls, cfg: VitConfig, checkpoint_path: str) -> "VisionTransformer":
+    def from_pretrained(
+        cls, cfg: VitConfig, checkpoint_path: str
+    ) -> "VisionTransformer":
         model = cls(cfg)
         ckpt = torch.load(checkpoint_path, weights_only=True)
         load_weights(model, ckpt)
         return model
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> list[Tensor]:
         B = x.shape[0]
 
         x = self.patch_embed(x)
@@ -112,12 +115,13 @@ class VisionTransformer(nn.Module):
         cls_with_pos = x[:, :1]
         patches_with_pos = x[:, 1:]
         registers = self.register_tokens.expand(B, -1, -1)
+        num_register_tokens = self.register_tokens.shape[1]
         x = torch.cat((cls_with_pos, registers, patches_with_pos), dim=1)
 
+        num_prefix = 1 + num_register_tokens  # CLS + register tokens
+        hidden_states: list[Tensor] = []
         for block in self.blocks:
             x = block(x)
+            hidden_states.append(x[:, num_prefix:])  # patch tokens only
 
-        x = self.norm(x)
-        # Remove register tokens before returning
-        num_register_tokens = self.register_tokens.shape[1]
-        return torch.cat((x[:, :1], x[:, 1 + num_register_tokens :]), dim=1)
+        return hidden_states

@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 import wandb
 from src.generated import ConfigModel
+from src.models.detector import decode_heatmap
 from src.utils.misc import generate_run_name
 from src.utils.typings import Stage
 
@@ -52,10 +53,8 @@ class Trainer:
             dtype=torch.bfloat16,
             enabled=self.cfg.use_mixed_precision,
         ):
-            pred_keypoints, pred_objectness = self.model(images)
-            loss_dict = self.criterion(
-                pred_keypoints, pred_objectness, target_keypoints, valid_mask
-            )
+            heatmap = self.model(images)
+            loss_dict = self.criterion(heatmap, target_keypoints, valid_mask)
             loss = loss_dict["loss"]
 
         self.grad_scaler.scale(loss).backward()
@@ -120,16 +119,16 @@ class Trainer:
             dtype=torch.bfloat16,
             enabled=self.cfg.use_mixed_precision,
         ):
-            pred_keypoints, pred_objectness = self.model(images)
-            loss_dict = self.criterion(
-                pred_keypoints, pred_objectness, target_keypoints, valid_mask
-            )
+            heatmap = self.model(images)
+            loss_dict = self.criterion(heatmap, target_keypoints, valid_mask)
+
+        pred_keypoints, pred_confidence = decode_heatmap(heatmap)
 
         self.metrics.update(
             target_keypoint=target_keypoints,
             pred_keypoint=pred_keypoints,
             target_objectness=valid_mask,
-            pred_objectness=pred_objectness,
+            pred_objectness=pred_confidence,
         )
 
         return {key: value.item() for key, value in loss_dict.items()}
