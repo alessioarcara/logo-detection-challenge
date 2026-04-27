@@ -169,21 +169,19 @@ class VisualizeCallback(Callback):
 
             if valid_mask[i].item():
                 gt = target_keypoints[i].cpu().numpy()
-                cv2.circle(
-                    img, self._to_px(gt, w, h), self.radius, (0, 255, 0), -1
-                )
+                cv2.circle(img, self._to_px(gt, w, h), self.radius, (0, 255, 0), -1)
 
             if pred_probs[i].item() > self.objectness_threshold:
                 pred = pred_keypoints[i].cpu().numpy()
-                cv2.circle(
-                    img, self._to_px(pred, w, h), self.radius, (255, 0, 0), -1
-                )
+                cv2.circle(img, self._to_px(pred, w, h), self.radius, (255, 0, 0), -1)
 
             wandb_images.append(wandb.Image(img))
 
-        wandb.log({
-            f"visualizations/{self.stage.value}_keypoints": wandb_images,
-        })
+        wandb.log(
+            {
+                f"visualizations/{self.stage.value}_keypoints": wandb_images,
+            }
+        )
         return False
 
     def _denormalize(self, tensor: Tensor, mean: Tensor, std: Tensor) -> np.ndarray:

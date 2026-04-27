@@ -20,7 +20,7 @@ class HeatmapLoss(nn.Module):
         beta: float = 4.0,
     ) -> None:
         super().__init__()
-        self.sigma = sigma  # fraction of output spatial size
+        self.sigma = sigma
         self.alpha = alpha
         self.beta = beta
 
@@ -42,6 +42,8 @@ class HeatmapLoss(nn.Module):
         sigma_px = self.sigma * min(height, width)
         g = torch.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * sigma_px**2))
         g = g / g.amax(dim=(-2, -1), keepdim=True).clamp(min=1e-6)
+        #! if valid_mask is False, set the heatmap to all zeros
+        #! so the model is forced to predict low probability everywhere
         g = g * valid_mask.float().view(B, 1, 1)
 
         return g.unsqueeze(1)

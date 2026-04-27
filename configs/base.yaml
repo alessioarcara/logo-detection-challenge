@@ -31,7 +31,7 @@ generator_config:
     - _target_type_: ./src/generator/blends.py:GaussianBlend
       _init_args_:
         sigma: 2.0
-  same_scene_blend_variants: false
+  same_scene_blend_variants: true
 
   logo_transform:
     _target_type_: albumentations:Compose
@@ -42,7 +42,7 @@ generator_config:
             max_size: ${image_size}
         - _target_type_: albumentations:Affine
           _init_args_:
-            scale: [0.2, 0.7]
+            scale: [0.1, 0.7]
             rotate: [-180, 180]
             shear: [-30, 30]
             translate_percent:
@@ -139,6 +139,35 @@ train_loader:
           _target_type_: albumentations:Compose
           _init_args_:
             transforms:
+              - _target_type_: albumentations:OneOf
+                _init_args_:
+                  transforms:
+                    - _target_type_: albumentations:GaussianBlur
+                      _init_args_:
+                        sigma_limit: [0.5, 2.0]
+                    - _target_type_: albumentations:MotionBlur
+                      _init_args_:
+                        blur_limit: [3, 7]
+                  p: 0.3
+              - _target_type_: albumentations:GaussNoise
+                _init_args_:
+                  std_range: [0.1, 0.3]
+                  p: 0.2
+              - _target_type_: albumentations:ImageCompression
+                _init_args_:
+                  quality_range: [40, 90]
+                  p: 0.3
+              - _target_type_: albumentations:Downscale
+                _init_args_:
+                  scale_range: [0.5, 0.9]
+                  p: 0.2
+              - _target_type_: albumentations:CoarseDropout
+                _init_args_:
+                  num_holes_range: [1, 5]
+                  hole_height_range: [0.02, 0.1]
+                  hole_width_range: [0.02, 0.1]
+                  fill: 0
+                  p: 0.3
               - _target_type_: albumentations:Normalize
                 _init_args_: {}
               - _target_type_: albumentations:ToTensorV2
@@ -217,6 +246,7 @@ model:
     neck_features: 256
     layer_indices: [5, 11] # 3, 6, 9, 12
     reassemble_scales: [2.0, 0.5]
+    head_dropout: 0.3
 
 metrics:
   _target_type_: ./src/training/metrics.py:MetricCollection
@@ -258,6 +288,6 @@ callbacks:
 criterion:
   _target_type_: ./src/training/losses.py:HeatmapLoss
   _init_args_:
-    sigma: 1.0
+    sigma: 0.05
     alpha: 2.0
     beta: 4.0

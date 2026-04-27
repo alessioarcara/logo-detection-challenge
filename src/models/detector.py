@@ -14,7 +14,8 @@ class Detector(nn.Module):
         freeze_backbone: bool,
         neck_features: int,
         layer_indices: list[int] = [2, 5, 8, 11],
-        reassemble_scales: list[float] = [2.0, 1.0, 0.5, 0.25],
+        reassemble_scales: list[float] = [4.0, 2.0, 1.0, 0.5],
+        head_dropout: float = 0.0,
     ) -> None:
         super().__init__()
         self.backbone = backbone
@@ -31,6 +32,7 @@ class Detector(nn.Module):
             nn.Conv2d(neck_features, neck_features // 4, 3, padding=1, bias=False),
             nn.BatchNorm2d(neck_features // 4),
             nn.ReLU(inplace=True),
+            nn.Dropout(head_dropout),
             nn.Conv2d(neck_features // 4, 1, 1),
         )
 
@@ -47,9 +49,12 @@ class Detector(nn.Module):
 
 def decode_heatmap(heatmap: Tensor) -> tuple[Tensor, Tensor]:
     """
-    (B,1,H,W) logits -> (B,2) -> (x,y) normalized, (B,1) peak logit."""
+    It takes a heatmap (B, 1, H, W) of logits,
+    finds the index of the maximum logit for each batch item,
+    and converts it to normalized (x, y) coordinates.
+    """
     B, _, H, W = heatmap.shape
-    flat = heatmap.view(B, -1)
+    flat = heatmap.view(B, -1)  # (B, H*W)
     max_logit, idx = flat.max(dim=-1, keepdim=True)
     x = ((idx % W).float() + 0.5) / W
     y = ((idx // W).float() + 0.5) / H
