@@ -13,12 +13,12 @@ use_mixed_precision: true
 compile_model: false
 
 generator_config:
-  logos_dir: "data/logos"
-  backgrounds_dir: "data/backgrounds"
+  logos_dir: "data/training/logos"
+  backgrounds_dir: "data/training/backgrounds"
   output_size:
     - ${image_size}
     - ${image_size}
-  length: 50000
+  length: 1000
   negative_ratio: 0.2
   seed: 42
   max_retries: 10
@@ -129,8 +129,9 @@ train_loader:
   _init_args_:
     dataset:
       _target_type_: ./src/data.py:DetectionDataset
+      _init_method_: from_sequence
       _init_args_:
-        dataset: ${generator.as_torch_dataset()}
+        sequence: ${generator.as_sequence()}
         transform:
           _target_type_: albumentations:Compose
           _init_args_:
@@ -144,6 +145,35 @@ train_loader:
     num_workers: 15
     pin_memory: true
     persistent_workers: true
+    collate_fn:
+      _target_type_: ./src/data.py:DetectionCollateFn
+      _init_args_: {}
+
+val_loader:
+  _target_type_: torch.utils.data:DataLoader
+  _init_args_:
+    dataset:
+      _target_type_: ./src/data.py:DetectionDataset
+      _init_method_: from_underfolder
+      _init_args_:
+        folder: "data/validation"
+        transform:
+          _target_type_: albumentations:Compose
+          _init_args_:
+            transforms:
+              - _target_type_: albumentations:Resize
+                _init_args_:
+                  height: ${image_size}
+                  width: ${image_size}
+                  interpolation: 1
+              - _target_type_: albumentations:Normalize
+                _init_args_: {}
+              - _target_type_: albumentations:ToTensorV2
+                _init_args_: {}
+    batch_size: 66
+    shuffle: false
+    num_workers: 4
+    pin_memory: true
     collate_fn:
       _target_type_: ./src/data.py:DetectionCollateFn
       _init_args_: {}
@@ -198,15 +228,23 @@ callbacks:
   - _target_type_: ./src/training/callbacks.py:ModelSavingCallback
     _init_args_:
       save_dir: "checkpoints"
-      history_key: train/loss
+      history_key: val/loss
       minimize: true
   - _target_type_: ./src/training/callbacks.py:EarlyStoppingCallback
     _init_args_:
-      history_key: train/loss
+      history_key: val/loss
       minimize: true
       patience: 10
   - _target_type_: ./src/training/callbacks.py:VisualizeCallback
     _init_args_:
+      stage: train
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+      num_samples: 8
+      objectness_threshold: 0.5
+  - _target_type_: ./src/training/callbacks.py:VisualizeCallback
+    _init_args_:
+      stage: val
       mean: [0.485, 0.456, 0.406]
       std: [0.229, 0.224, 0.225]
       num_samples: 8

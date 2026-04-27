@@ -10,7 +10,7 @@ from torch import Tensor
 
 import wandb
 from src.utils.misc import sanitize
-from src.utils.typings import PathLike
+from src.utils.typings import PathLike, Stage
 
 if TYPE_CHECKING:
     from src.training.trainer import Trainer
@@ -129,12 +129,14 @@ class EarlyStoppingCallback(ModelMonitorCallback):
 class VisualizeCallback(Callback):
     def __init__(
         self,
+        stage: str,
         mean: list[float],
         std: list[float],
         num_samples: int = 8,
         radius: int = 6,
         objectness_threshold: float = 0.5,
     ) -> None:
+        self.stage = Stage(stage)
         self.mean = torch.tensor(mean).view(3, 1, 1)
         self.std = torch.tensor(std).view(3, 1, 1)
         self.num_samples = num_samples
@@ -142,7 +144,11 @@ class VisualizeCallback(Callback):
         self.objectness_threshold = objectness_threshold
 
     def on_all_evals_end(self, trainer: "Trainer") -> bool:
-        batch = next(iter(trainer.train_loader))
+        loader = trainer._get_loader(self.stage)
+        if loader is None:
+            return False
+
+        batch = next(iter(loader))
         images, target_keypoints, valid_mask = trainer._prepare_input(batch)
 
         with torch.inference_mode():
@@ -172,7 +178,7 @@ class VisualizeCallback(Callback):
 
             wandb_images.append(wandb.Image(img))
 
-        wandb.log({"visualizations/keypoints": wandb_images})
+        wandb.log({f"visualizations/{self.stage.value}_keypoints": wandb_images})
         return False
 
     def _denormalize(self, tensor: Tensor, mean: Tensor, std: Tensor) -> np.ndarray:

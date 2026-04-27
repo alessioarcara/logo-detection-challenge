@@ -17,6 +17,7 @@ class Trainer:
         self.cfg = cfg
         self.model = cfg.model.to(cfg.device)
         self.train_loader = cfg.train_loader
+        self.val_loader = cfg.val_loader
         self.metrics = cfg.metrics
         self.optim = cfg.optim
         self.scheduler = cfg.scheduler
@@ -31,7 +32,7 @@ class Trainer:
             case Stage.TRAIN:
                 return self.train_loader
             case Stage.VAL:
-                return None  # TODO: implement val loader
+                return self.val_loader
             case _:
                 return None
 
@@ -142,7 +143,7 @@ class Trainer:
             callback.on_all_evals_end(self)
 
     @torch.inference_mode()
-    def eval(self, stage: Stage, *, log: bool = True) -> dict[str, float]:
+    def eval(self, stage: Stage) -> dict[str, float]:
         loader = self._get_loader(stage)
 
         if loader is None:

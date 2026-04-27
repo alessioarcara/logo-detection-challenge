@@ -27,6 +27,7 @@ schema:
   optim: torch.optim:Optimizer
   scheduler: torch.optim.lr_scheduler:LRScheduler
   train_loader: Dataloader
+  val_loader: Dataloader
   criterion: TorchModule
   metrics: ./src/training/metrics.py:MetricCollection
   callbacks: list[Callback]

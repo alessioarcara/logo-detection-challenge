@@ -1,21 +1,36 @@
-from collections.abc import Sized
-from typing import Any
+from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, Self
+
+if TYPE_CHECKING:
+    from pipelime.sequences import SamplesSequence  # type: ignore[import-untyped]
+
+import albumentations as A
 import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset
-import albumentations as A
+
+from src.utils.typings import PathLike
 
 
 class DetectionDataset(Dataset):
-    def __init__(self, dataset: Sized, transform: A.Compose) -> None:
+    def __init__(self, dataset: Any, transform: A.Compose) -> None:
         self.dataset = dataset
         self.transform = transform
 
+    @classmethod
+    def from_sequence(cls, sequence: SamplesSequence, transform: A.Compose) -> Self:
+        return cls(dataset=sequence.torch_dataset(), transform=transform)
+
+    @classmethod
+    def from_underfolder(cls, folder: PathLike, transform: A.Compose) -> Self:
+        from pipelime.sequences import SamplesSequence  # type: ignore[import-untyped]
+
+        sequence = SamplesSequence.from_underfolder(folder)
+        return cls.from_sequence(sequence=sequence, transform=transform)
+
     def __len__(self) -> int:
-        if not isinstance(self.dataset, Sized):
-            raise TypeError("DetectionDataset source dataset must implement __len__")
         return len(self.dataset)
 
     def __getitem__(self, index: int) -> dict[str, Tensor]:

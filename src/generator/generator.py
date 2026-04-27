@@ -9,8 +9,6 @@ from pipelime.items import (  # type: ignore[import-untyped]
     YamlMetadataItem,
 )
 from pipelime.sequences import Sample, SamplesSequence  # type: ignore[import-untyped]
-from torch.utils.data import Dataset as TorchDataset
-
 from src.generator.blender import Blender
 from src.utils.bbox import bbox_center, bbox_from_alpha, shift_point, to_array
 from src.utils.io import get_image_paths_in_dir, load_rgb, load_rgba
@@ -53,9 +51,6 @@ class LogoDatasetGenerator:
         return SamplesSequence.from_callable(
             generator_fn=self.generate, length=len(self)
         )
-
-    def as_torch_dataset(self) -> TorchDataset:
-        return self.as_sequence().torch_dataset()
 
     def write_underfolder(self, folder: PathLike, exists_ok: bool = False) -> Path:
         folder = Path(folder)
