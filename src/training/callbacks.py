@@ -31,26 +31,29 @@ class ModelMonitorCallback(Callback):
         self.best = float("inf") if minimize else -float("inf")
 
     def on_all_evals_end(self, trainer: "Trainer") -> bool:
-        value = self._get_history_value(trainer)
-        if value is None:
-            return False
-
-        return self._update_best(value)
-
-    def _get_history_value(self, trainer: "Trainer") -> float | None:
         value = trainer.history.get(self.history_key)
         if value is None:
             logger.warning(
                 "{} not found in history; skipping model monitoring", self.history_key
             )
-        return value
+            return False
 
-    def _update_best(self, value: float) -> bool:
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            logger.warning(
+                "{} in history is not a number (got {}); skipping model monitoring",
+                self.history_key,
+                value,
+            )
+            return False
+
         improved = value < self.best if self.minimize else value > self.best
         if improved:
             self.best = value
+            return True
 
-        return improved
+        return False
 
 
 class ModelSavingCallback(ModelMonitorCallback):
@@ -61,6 +64,7 @@ class ModelSavingCallback(ModelMonitorCallback):
 
     def on_all_evals_end(self, trainer: "Trainer") -> bool:
         improved = super().on_all_evals_end(trainer)
+
         if not improved:
             return False
 
@@ -93,37 +97,33 @@ class EarlyStoppingCallback(ModelMonitorCallback):
         self.counter = 0
 
     def on_all_evals_end(self, trainer: "Trainer") -> bool:
-        value = self._get_history_value(trainer)
-        if value is None:
-            return False
+        improved = super().on_all_evals_end(trainer)
 
-        improved = self._update_best(value)
         if improved:
             self.counter = 0
             logger.info(
-                "Early stopping monitor improved ({}={:.6f}); counter reset",
+                "Improvement detected for {}={:.6f}; resetting early stopping counter",
                 self.history_key,
-                value,
+                self.best,
             )
-            return True
-
-        self.counter += 1
-        logger.info(
-            "No improvement for {} ({}/{} evals)",
-            self.history_key,
-            self.counter,
-            self.patience,
-        )
-
-        if self.counter >= self.patience:
-            trainer.stop_training = True
+        else:
+            self.counter += 1
             logger.info(
-                "Early stopping triggered for {} after {} evals without improvement",
+                "No improvement for {} ({}/{} evals)",
                 self.history_key,
                 self.counter,
+                self.patience,
             )
 
-        return False
+            if self.counter >= self.patience:
+                trainer.stop_training = True
+                logger.info(
+                    "Early stopping triggered for {} after {} evals without improvement",
+                    self.history_key,
+                    self.counter,
+                )
+
+        return improved
 
 
 class VisualizeCallback(Callback):
@@ -133,22 +133,25 @@ class VisualizeCallback(Callback):
         std: list[float],
         num_samples: int = 8,
         radius: int = 6,
+        objectness_threshold: float = 0.5,
     ) -> None:
         self.mean = torch.tensor(mean).view(3, 1, 1)
         self.std = torch.tensor(std).view(3, 1, 1)
         self.num_samples = num_samples
         self.radius = radius
+        self.objectness_threshold = objectness_threshold
 
     def on_all_evals_end(self, trainer: "Trainer") -> bool:
         batch = next(iter(trainer.train_loader))
         images, target_keypoints, valid_mask = trainer._prepare_input(batch)
 
         with torch.inference_mode():
-            pred_keypoints, _ = trainer.model(images)
+            pred_keypoints, objectness_logits = trainer.model(images)
 
         n = min(self.num_samples, images.size(0))
         mean = self.mean.to(images.device)
         std = self.std.to(images.device)
+        objectness_probs = torch.sigmoid(objectness_logits)
 
         wandb_images = []
         for i in range(n):
@@ -161,10 +164,11 @@ class VisualizeCallback(Callback):
                     img, self._to_px(gt, w, h), self.radius, (0, 255, 0), -1
                 )  # Green for GT
 
-            pred = pred_keypoints[i].cpu().numpy()
-            cv2.circle(
-                img, self._to_px(pred, w, h), self.radius, (255, 0, 0), -1
-            )  # Red for pred
+            if objectness_probs[i].item() > self.objectness_threshold:
+                pred = pred_keypoints[i].cpu().numpy()
+                cv2.circle(
+                    img, self._to_px(pred, w, h), self.radius, (255, 0, 0), -1
+                )  # Red for pred
 
             wandb_images.append(wandb.Image(img))
 
