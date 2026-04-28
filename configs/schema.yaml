@@ -20,7 +20,6 @@ schema:
   image_size: int
 
   use_mixed_precision: bool
-  compile_model: bool
 
   generator: ./src/generator/generator.py:LogoDatasetGenerator
   model: TorchModule
