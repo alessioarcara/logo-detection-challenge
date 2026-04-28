@@ -62,6 +62,7 @@ class ModelSavingCallback(ModelMonitorCallback):
         super().__init__(history_key=history_key, minimize=minimize)
         self.out_dir = Path(save_dir)
         self.out_dir.mkdir(parents=True, exist_ok=True)
+        self._last_path: Path | None = None
 
     def on_all_evals_end(self, trainer: "Trainer") -> bool:
         improved = super().on_all_evals_end(trainer)
@@ -69,12 +70,16 @@ class ModelSavingCallback(ModelMonitorCallback):
         if not improved:
             return False
 
+        if self._last_path is not None:
+            self._last_path.unlink(missing_ok=True)
+
         checkpoint_path = self._checkpoint_path(trainer)
         state_dict = {
             name: tensor.detach().cpu()
             for name, tensor in trainer.model.state_dict().items()
         }
         torch.save(state_dict, checkpoint_path)
+        self._last_path = checkpoint_path
         logger.info(
             "Saved improved checkpoint to {} ({}={:.6f})",
             checkpoint_path,
@@ -85,8 +90,8 @@ class ModelSavingCallback(ModelMonitorCallback):
 
     def _checkpoint_path(self, trainer: "Trainer") -> Path:
         run_name = sanitize(trainer.cfg.wandb_run_name)
-        metric_name = sanitize(self.history_key)
-        return self.out_dir / f"{run_name}_{metric_name}_best.pth"
+        metric = sanitize(self.history_key)
+        return self.out_dir / f"{run_name}_{metric}={self.best:.4f}.pth"
 
 
 class EarlyStoppingCallback(ModelMonitorCallback):

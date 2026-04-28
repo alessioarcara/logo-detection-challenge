@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import cast
 
 import torch
@@ -5,9 +6,18 @@ import torch.nn as nn
 from torch import Tensor
 
 from src.models.neck import DPTNeck
+from src.utils.checkpoint import load_weights
 
 
-class Detector(nn.Module):
+class BaseModel(nn.Module):
+    def _load_checkpoint(self, checkpoint: Path | None) -> None:
+        if checkpoint is None:
+            return
+        sd = torch.load(checkpoint, map_location="cpu", weights_only=True)
+        load_weights(self, sd)
+
+
+class Detector(BaseModel):
     def __init__(
         self,
         backbone: nn.Module,
@@ -16,6 +26,7 @@ class Detector(nn.Module):
         layer_indices: list[int] = [2, 5, 8, 11],
         reassemble_scales: list[float] = [4.0, 2.0, 1.0, 0.5],
         head_dropout: float = 0.0,
+        checkpoint: Path | None = None,
     ) -> None:
         super().__init__()
         self.backbone = backbone
@@ -39,6 +50,8 @@ class Detector(nn.Module):
         if freeze_backbone:
             for param in self.backbone.parameters():
                 param.requires_grad = False
+
+        self._load_checkpoint(checkpoint)
 
     def forward(self, x: Tensor) -> Tensor:
         hidden_states = self.backbone(x)

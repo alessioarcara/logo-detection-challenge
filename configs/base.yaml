@@ -21,7 +21,7 @@ generator_config:
   output_size:
     - ${image_size}
     - ${image_size}
-  length: 1000
+  length: 10000
   negative_ratio: 0.1
   seed: 42
   max_retries: 10
@@ -201,7 +201,7 @@ val_loader:
                 _init_args_: {}
               - _target_type_: albumentations:ToTensorV2
                 _init_args_: {}
-    batch_size: 16
+    batch_size: 66
     shuffle: false
     num_workers: 4
     pin_memory: true
@@ -263,11 +263,11 @@ callbacks:
   - _target_type_: ./src/training/callbacks.py:ModelSavingCallback
     _init_args_:
       save_dir: "checkpoints"
-      history_key: val/loss
+      history_key: val/localization_accuracy
       minimize: true
   - _target_type_: ./src/training/callbacks.py:EarlyStoppingCallback
     _init_args_:
-      history_key: val/loss
+      history_key: val/localization_accuracy
       minimize: true
       patience: 10
   - _target_type_: ./src/training/callbacks.py:VisualizeCallback
