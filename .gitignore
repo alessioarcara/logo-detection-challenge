@@ -173,5 +173,6 @@ pyrightconfig.json
 ### Custom ###
 .vscode/
 checkpoints/
-data/
+data/raw/
+data/training/
 wandb/

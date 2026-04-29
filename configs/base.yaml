@@ -3,7 +3,7 @@ device: cuda
 
 wandb_entity: aarcara
 wandb_project: eyecan
-wandb_run_name: test
+wandb_run_name: aggressive_augmentation
 
 num_epochs: 100
 eval_freq: 1
@@ -41,9 +41,9 @@ generator_config:
             max_size: ${image_size}
         - _target_type_: albumentations:Affine
           _init_args_:
-            scale: [0.1, 0.7]
+            scale: [0.05, 0.7]
             rotate: [-180, 180]
-            shear: [-30, 30]
+            shear: [-45, 45]
             translate_percent:
               x: [-0.5, 0.5]
               y: [-0.5, 0.5]
@@ -52,7 +52,7 @@ generator_config:
             p: 1.0
         - _target_type_: albumentations:Perspective
           _init_args_:
-            scale: [0.05, 0.20]
+            scale: [0.2, 0.5]
             keep_size: true
             border_mode: 0
             fill: 0
@@ -246,6 +246,7 @@ model:
     layer_indices: [5, 11] # 3, 6, 9, 12
     reassemble_scales: [2.0, 0.5]
     head_dropout: 0.3
+    checkpoint: checkpoints/aggressive_augmentation_val-localization_accuracy=0.8939.pth
 
 metrics:
   _target_type_: ./src/training/metrics.py:MetricCollection
@@ -256,19 +257,20 @@ metrics:
       - _target_type_: ./src/training/metrics.py:MeanAbsoluteError
         _init_args_: {}
       - _target_type_: ./src/training/metrics.py:LogoPresenceAccuracy
-        _init_args_: {}
+        _init_args_:
+          threshold: 0.1
 
 callbacks:
   - _target_type_: ./src/training/callbacks.py:ModelSavingCallback
     _init_args_:
       save_dir: "checkpoints"
       history_key: val/localization_accuracy
-      minimize: true
+      minimize: false
   - _target_type_: ./src/training/callbacks.py:EarlyStoppingCallback
     _init_args_:
       history_key: val/localization_accuracy
-      minimize: true
-      patience: 10
+      minimize: false
+      patience: 20
   - _target_type_: ./src/training/callbacks.py:VisualizeCallback
     _init_args_:
       stage: train
