@@ -1,6 +1,6 @@
 # The Logo Detector Challenge
  
-> This project is my solution to a computer vision challenge organized by **[eyecan.ai](https://www.eyecan.ai)**. The goal: detect and localize a specific logo in real-world images, with no training data provided — just the logo itself.
+> This repository is my solution to a computer vision challenge organized by **[eyecan.ai](https://www.eyecan.ai)**. The goal: detect and localize a specific logo in real-world images, with no training data provided — just the logo itself.
  
 ## Approach
  
