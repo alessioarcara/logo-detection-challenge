@@ -16,7 +16,7 @@ The challenge was tackled along two complementary tracks:
 - Added transformations to compensate for resolution drops, sensor noise, and motion blur, together with Dropout to encourage a more distributed use of the logo's features rather than reliance on a single part.
 ### Detector
  
-- Loading DINOv2 patch14 (small/base) weights into a ViT: learning a feature extractor from scratch on a synthetic dataset is hard, while pre-trained weights allow faster convergence and better performance. DINO was chosen specifically because features learned through self-supervised training are more robust and generalize better than a zero-shot model, in addition to outperforming ImageNet features. Moreover, DINOv2 uses a patch embedding of 14 instead of 16 (as in DINOv1), yielding higher resolution.
+- Loading DINOv2 patch14 (small/base) weights into a ViT: learning a feature extractor from scratch on a synthetic dataset is hard, while pre-trained weights allow faster convergence and better performance. DINO was chosen specifically because features learned through self-supervised training are more robust and generalize better than a zero-shot model, in addition to outperforming ImageNet features. Moreover, DINOv2 uses a patch embedding of 14 instead of 16 (as in DINOv3), yielding higher resolution.
 - The feature extractor is kept frozen.
 - To guarantee sufficient spatial context, an FPN is added — specifically a simplified version of DPT.
 - To get more supervision signal than regressing just two values (x, y), a heatmap head with a CenterNet-based loss was chosen: the model predicts a heatmap and the location with the highest logit/probability is taken. This provides denser supervision and thus faster convergence.
